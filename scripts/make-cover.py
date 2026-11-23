@@ -4,14 +4,15 @@ Usage: python3 make-cover.py spec.json out.jpg
 spec.json keys (all strings unless noted):
   accent   "#f5a524"            accent color
   kicker   "A HANDS-ON GUIDE"   small caps line above the title
-  title    "Temporal<br>in Practice"   use <br> for line breaks
+  title    "Temporal<br>in Practice"   use <br> for line breaks; long lines shrink to fit
   sub      one-sentence promise under the title
   events   [["2021", "Snap  what they wrote"], ...]  up to ~8 timeline rows;
            "Name  rest" (two spaces) bolds Name; text starting "!!" shows in red
   foot     short line at the bottom
+Only title is required. Leave events out for a cover with no timeline.
 """
-import json, os, subprocess, sys, tempfile
-BRAVE = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+import json, os, re, shutil, sys, tempfile
+from _tools import convert, screenshot
 
 def label(t):  # "Company  what" -> bold company name
     t = t.removeprefix("!!")  # "!!" only marks the row red (see page())
@@ -19,6 +20,10 @@ def label(t):  # "Company  what" -> bold company name
     return f"<b>{who}</b>&nbsp;&nbsp;{what}" if sep else t
 
 def page(b):
+    b = {"accent": "#f5a524", "kicker": "", "sub": "", "events": [], "foot": "", **b}
+    # 200px fits an 11-letter line in the 1320px column; longer lines shrink.
+    longest = max(len(re.sub(r"<[^>]+>|&\w+;", "", l)) for l in re.split(r"<br\s*/?>", b["title"]))
+    size = max(90, min(200, int(1320 / (0.6 * longest))))
     rows = "".join(
         f'<div class="ev{" bad" if t.startswith("!!") else ""}"><span class="dot"></span>'
         f'<span class="n">{n}</span><span class="t">{label(t)}</span></div>' for n, t in b["events"])
@@ -30,7 +35,7 @@ body{{background:#0b1020;color:#f2f4f8;font-family:'Avenir Next','Helvetica Neue
 .wrap{{position:absolute;inset:150px 140px}}
 .kicker{{font-size:44px;letter-spacing:12px;font-weight:600;color:{b['accent']}}}
 .bar{{width:160px;height:12px;background:{b['accent']};margin:44px 0 60px}}
-h1{{font-family:Georgia,serif;font-weight:700;font-size:200px;line-height:1.02;margin:0;letter-spacing:-3px}}
+h1{{font-family:Georgia,serif;font-weight:700;font-size:{size}px;line-height:1.02;margin:0;letter-spacing:-3px}}
 .sub{{font-size:58px;line-height:1.35;color:#c9d1e3;margin-top:70px;max-width:1250px}}
 .hist{{position:absolute;left:0;right:0;bottom:330px;font-family:Menlo,monospace;font-size:40px;color:#9aa6c4}}
 .hist:before{{content:'';position:absolute;left:15px;top:30px;bottom:30px;width:4px;background:#ffffff22}}
@@ -43,15 +48,15 @@ b{{color:#e6eaf3;font-weight:700}}
 .foot b{{color:{b['accent']};font-weight:600}}
 </style></head><body><div class="grid"></div><div class="glow"></div><div class="wrap">
 <div class="kicker">{b['kicker']}</div><div class="bar"></div><h1>{b['title']}</h1>
-<div class="sub">{b['sub']}</div><div class="hist">{rows}</div>
+<div class="sub">{b['sub']}</div>{f'<div class="hist">{rows}</div>' if rows else ''}
 <div class="foot"><span>{b['foot']}</span></div></div></body></html>"""
 
 
-b = json.load(open(sys.argv[1])); out = os.path.abspath(sys.argv[2])
+b = json.load(open(sys.argv[1], encoding="utf-8")); out = os.path.abspath(sys.argv[2])
 d = tempfile.mkdtemp(); h = os.path.join(d, "c.html"); png = os.path.join(d, "c.png")
-open(h, "w").write(page(b))
-subprocess.run([BRAVE, "--headless", "--disable-gpu", "--hide-scrollbars", "--window-size=1600,2560",
-                f"--screenshot={png}", "file://" + h], check=True, capture_output=True)
-subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "90", png, "--out", out],
-               check=True, capture_output=True)
+open(h, "w", encoding="utf-8").write(page(b))
+screenshot(h, png, 1600, 2560)
+if not convert(png, out, "jpeg"):
+    raise SystemExit("could not write " + out)
+shutil.rmtree(d)
 print("cover:", out)

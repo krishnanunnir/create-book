@@ -41,6 +41,11 @@ Unless the user says otherwise, the reader is:
 Assume nothing about the book's topic and a lot about software in general. Don't
 speed up once an idea is grounded: each new idea gets the same slow build.
 
+If the book isn't for software engineers (cooking, history, personal finance), keep
+the second and third points and replace the first with what the brief says the
+reader already knows. Draw the analogies in §4 from that knowledge, not from
+backend systems.
+
 The user found a first draft written for a "quick, competent" reader too high-level
 to learn from: terms arrived with one-line definitions, mechanisms were stated
 instead of worked, and they couldn't predict anything from it. Err slow.
@@ -204,7 +209,7 @@ Then run the checker on the sources. It flags many of these tells, plus long
 paragraphs, long stretches without a heading and wide code lines:
 
 ```bash
-python3 ~/.claude/skills/create-book/scripts/lint-md.py md/*.md
+python3 $SKILL/scripts/lint-md.py md/*.md
 ```
 
 ## 6. Reader test (each chapter)

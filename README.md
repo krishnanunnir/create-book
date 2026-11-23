@@ -21,7 +21,7 @@ a cover.
 - **Make a cover.** A 1600×2560 JPEG (Kindle's recommended size) with a title, a
   one-line promise and a short timeline taken from the book's content.
 - **Check the result.** A script catches broken files, wrong image formats and leaked
-  local paths. Claude also renders a chapter at phone width and looks at it.
+  local paths. Claude also screenshots chapters at phone width and looks at them.
 
 ## You stay in charge
 
@@ -46,12 +46,15 @@ Start a new Claude Code session so it picks up the skill.
 | Tool | Used for |
 |---|---|
 | [Calibre](https://calibre-ebook.com/) | building and converting books |
-| Python 3 | fixing, checking and linting |
+| Python 3 | fixing, checking, linting, covers and previews |
 | Node.js (`npx`) | fetching web articles |
-| Brave or Chrome | covers and phone previews |
-| `sips`, `xmllint` | images and XML (built into macOS) |
+| Brave, Chrome, Chromium or Edge | covers and phone previews |
+| `sips` (built into macOS) or ImageMagick | converting images |
+| `xmllint` (optional) | checking that the book's XML is valid |
 
-The scripts are written for macOS.
+The scripts are written and tested on macOS. They are meant to run on Linux too, with
+ImageMagick in place of `sips`, but that has not been tested. If your browser isn't
+found, set `BOOK_BROWSER` to its path.
 
 ## Try it
 
@@ -86,8 +89,11 @@ python3 check-epub.py out.epub
 # Review Markdown chapters: length, wide code, stock phrases
 python3 lint-md.py md/*.md
 
-# Render a cover from a JSON spec
+# Render a cover from a JSON spec (only "title" is required)
 python3 make-cover.py spec.json cover.jpg
+
+# Screenshot page 3 of an EPUB at phone width
+python3 preview-epub.py out.epub 3 --out shot.png
 ```
 
 To get another format, convert the checked EPUB with Calibre:
@@ -101,7 +107,7 @@ ebook-convert out.epub out.pdf
 ```text
 SKILL.md               the workflow Claude follows
 references/writing.md  how chapters are planned and written
-scripts/               build, fix, check, lint, cover
+scripts/               build, fix, check, lint, cover, preview
 assets/book.css        the book's stylesheet
 ```
 

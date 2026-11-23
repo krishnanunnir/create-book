@@ -5,6 +5,23 @@ description: Write, build, clean up, verify and add covers to ebooks (EPUB by de
 
 # Books for Kindle and phones
 
+A finished book has to do three things:
+
+1. **Teach.** The reader can't stop the book to ask a question, so the text has to
+   answer each one before it comes up. When Claude writes the content, read
+   `references/writing.md` before any chapter. It builds the whole writing process
+   from that one fact: brief, outline (approved by the user), one chapter at a time,
+   edit pass, reader test, whole-book pass. Write for a true beginner in the topic
+   and build each idea by hand from a tiny working version; a draft pitched at a
+   "quick, competent" reader was too high-level to learn from.
+2. **Survive the device.** A Kindle or a phone is a small screen with a limited
+   renderer. Most broken-book bugs come from a desktop assumption that fails there.
+   §1 lists what the device does and the rules that follow from it.
+3. **Be safe to share.** No local paths leak, and no fact, date or quote is invented.
+
+Every step below serves one of these. When a rule doesn't fit a case, go back to its
+reason.
+
 ## 0. Before writing: three checkpoints with the user
 
 Stop at each one and wait for the user's answer. Don't skip one because the request
@@ -23,26 +40,25 @@ looks clear.
 For a web-article collection, the structure to approve is `order.txt` and its Parts,
 and there is no chapter 1 to write. For fixing an existing EPUB, ask only the format.
 
-A finished book has to do three things:
+## Scripts and tools
 
-1. **Teach.** The reader can't stop the book to ask a question, so the text has to
-   answer each one before it comes up. When Claude writes the content, read
-   `references/writing.md` before any chapter. It builds the whole writing process
-   from that one fact: brief, outline (approved by the user), one chapter at a time,
-   edit pass, reader test, whole-book pass. Write for a true beginner in the topic
-   and build each idea by hand from a tiny working version; a draft pitched at a
-   "quick, competent" reader was too high-level to learn from.
-2. **Survive the device.** A Kindle or a phone is a small screen with a limited
-   renderer. Most broken-book bugs come from a desktop assumption that fails there.
-   §1 lists what the device does and the rules that follow from it.
-3. **Be safe to share.** No local paths leak, and no fact, date or quote is invented.
+The scripts are in the `scripts/` folder next to this file. The commands below write
+it as `$SKILL`, which stands for this skill's base directory (for a personal install,
+`~/.claude/skills/create-book`). Replace it with the real path when you run them.
 
-Every step below serves one of these. When a rule doesn't fit a case, go back to its
-reason.
+They need:
 
-Scripts are in `~/.claude/skills/create-book/scripts/`. They need Calibre
-(`ebook-convert`, `ebook-meta`), `npx` (for percollate), Brave or Chrome (for covers
-and previews), and the macOS built-ins `sips` and `xmllint`.
+- Calibre (`ebook-convert`) to build and convert books;
+- Python 3;
+- `npx` (Node.js) to fetch web articles with percollate;
+- Brave, Chrome, Chromium or Edge for covers and previews. Set `BOOK_BROWSER` to the
+  browser's path if it isn't found;
+- `sips` (built into macOS) or ImageMagick to convert images;
+- `xmllint` to validate XML. Without it, `check-epub.py` skips that check and says so.
+
+If a tool is missing, tell the user which one and how to install it. Don't work
+around a missing Calibre with another converter: the page-break and TOC rules below
+depend on its options.
 
 ## 1. What the device does, and what follows
 
@@ -69,28 +85,32 @@ Ways to fit 52 characters:
 ### Markdown (books Claude writes)
 
 ```bash
-~/.claude/skills/create-book/scripts/md-to-epub.sh \
+$SKILL/scripts/md-to-epub.sh \
   book.md "Title" "Author" cover.jpg out.epub
 ```
 
 - One `# h1` per chapter. Only an h1 starts a new page.
 - A `# Part N: ...` h1 makes a part page, and the chapter h1 right after it shares
-  that page.
+  that page. So don't start an ordinary chapter title with the word "Part ".
 - `## h2` marks a section. It shows in the TOC but doesn't start a page. Calibre's
   default breaks before every h2, and the script turns that off.
 - Write long books as `md/01.md`, `md/02.md`… and `cat` them together. Save that
   command in a small build script next to the sources, so every rebuild repeats it.
+- For a book that isn't in English, set the language: `BOOK_LANG=de md-to-epub.sh …`.
+- Before building, run `python3 $SKILL/scripts/lint-md.py md/*.md`. It flags wide
+  code lines, long paragraphs, long stretches with no heading and stock phrases.
 
 ### Web articles (collections)
 
 ```bash
-~/.claude/skills/create-book/scripts/web-to-epub.sh \
+$SKILL/scripts/web-to-epub.sh \
   order.txt "Title" out.epub cover.jpg
 ```
 
-`order.txt` lists one URL or local `.html` file per line, in reading order. Local
-HTML files make good intro and "Part N: ..." divider pages. Start each one with
-`<title>Part 1: Foundations</title>` and an `<h1>`.
+`order.txt` lists one URL or local `.html` file per line, in reading order. Blank
+lines and lines starting with `#` are skipped. Local HTML files make good intro and
+"Part N: ..." divider pages. Start each one with `<title>Part 1: Foundations</title>`
+and an `<h1>`.
 
 Some sites block automated fetchers. If a page fails, skip it and list it as "link
 only" on its Part page. Don't work around the block.
@@ -101,7 +121,7 @@ After the build, read the start and end of each article's text, then remove what
 find:
 
 ```bash
-python3 ~/.claude/skills/create-book/scripts/fix-epub.py \
+python3 $SKILL/scripts/fix-epub.py \
   out.epub \
   --strip-suffix " | Vantage" \
   --strip-suffix " - Snap Engineering" \
@@ -116,10 +136,13 @@ Keep these flags in the project's build script. `web-to-epub.sh` already runs
 - nests a flat TOC under its "Part" entries;
 - with `--cover`, replaces the cover image.
 
+`fix-epub.py` also repairs an EPUB someone else made. It changes the file in place,
+so work on a copy.
+
 ## 3. Cover
 
 ```bash
-python3 ~/.claude/skills/create-book/scripts/make-cover.py \
+python3 $SKILL/scripts/make-cover.py \
   spec.json cover.jpg
 ```
 
@@ -134,13 +157,16 @@ serif title, a one-line promise and a timeline. Example `spec.json`:
  "foot": "Foundations · Origins · Big companies · Migrations"}
 ```
 
+- Only `title` is required. Leave `events` out when the book has no real sequence to
+  show; the cover is then title, promise and footer.
 - Take the timeline rows from the book's real content: chapter milestones, the
   running example's steps, or sources with real dates. Never invent dates.
 - Two spaces after a name make the name bold. `!!` at the start of an event shows it
   in red.
+- Break the title with `<br>` so no line is much over 11 letters. Longer lines are
+  shrunk to fit, which makes the whole title smaller.
 - For a series, keep the layout and change only `accent`.
-- Look at the result: `sips -Z 900 cover.jpg --out preview.jpg`, then Read the
-  preview. Fix anything uneven.
+- Look at the result: Read `cover.jpg`. Fix anything uneven.
 - Markdown builds take the cover as `md-to-epub.sh`'s fourth argument. Web builds take
   it through `web-to-epub.sh` or `fix-epub.py --cover`.
 
@@ -151,7 +177,7 @@ A build that finished is not yet a book that works. Check it two ways.
 **Mechanically:**
 
 ```bash
-python3 ~/.claude/skills/create-book/scripts/check-epub.py out.epub
+python3 $SKILL/scripts/check-epub.py out.epub
 ```
 
 It exits 1 on hard problems: mimetype not first in the zip, a wrong image format or
@@ -159,21 +185,18 @@ media type, missing files, `file:///` leaks, invalid XML, and duplicate TOC
 `playOrder` values. It also reports things to judge yourself: near-empty pages, wide
 code lines, the TOC tree and the cover size.
 
-**By eye, at phone width.** A headless window on its own lays out too wide, so render
-a chapter inside a 360px iframe:
+**By eye, at phone width.** `check-epub.py` numbers the pages. Screenshot at least the
+first chapter, and every page that has a diagram or a table:
 
 ```bash
-mkdir ep && cd ep && unzip -q ../out.epub && cd ..
-echo "<html><body style='margin:0;overflow:hidden'><iframe src='ep/PATH/chapter.html' style='border:0;width:360px;height:30000px;margin-top:-0px'></iframe></body></html>" > v.html
-"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" --headless --disable-gpu --hide-scrollbars \
-  --allow-file-access-from-files --virtual-time-budget=5000 --window-size=360,1300 --screenshot=$PWD/shot.png file://$PWD/v.html
+python3 $SKILL/scripts/preview-epub.py out.epub 3 --out shot.png
 ```
 
-- Raise `margin-top` to scroll down the chapter.
-- `--virtual-time-budget` waits for images to load.
-- Add `--force-device-scale-factor=2` to check diagram alignment. At 1x, downscaling
-  can make box borders look misaligned when they are fine.
-- Don't crop with `sips -c`, which is unreliable. Render the region you want instead.
+Then Read `shot.png`. The shot is 360 pixels wide and 1300 tall.
+
+- `--scroll 1300` moves the window down the chapter. Step through a long one.
+- `--scale 2` gives a sharper image. Use it to check diagram alignment: at 1x,
+  downscaling can make box borders look misaligned when they are fine.
 
 ## 5. Deliver
 
@@ -181,7 +204,6 @@ echo "<html><body style='margin:0;overflow:hidden'><iframe src='ep/PATH/chapter.
   `ebook-convert out.epub out.azw3` (or `.pdf`, `.docx`). For PDF, add
   `--paper-size a5 --pdf-default-font-size 14`. Open the result and look at a
   chapter, since `check-epub.py` only checks the EPUB.
-
 - Put the final book files in one `Final/` folder and give the user that path.
 - Keep sources, build scripts, `spec.json` and covers in `build-files/` next to it.
 - Send to Kindle takes EPUB by email (50 MB limit) or through the Send to Kindle app.

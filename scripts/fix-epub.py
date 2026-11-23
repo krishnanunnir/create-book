@@ -8,7 +8,8 @@
 Usage: python3 fix-epub.py book.epub [--cover cover.jpg]
            [--strip-suffix " | Site"]... [--junk REGEX]...
 """
-import argparse, html, os, re, shutil, subprocess, tempfile, zipfile
+import argparse, html, os, re, shutil, tempfile, zipfile
+from _tools import convert
 
 ap = argparse.ArgumentParser()
 ap.add_argument("epub")
@@ -19,7 +20,7 @@ a = ap.parse_args()
 
 tmp = tempfile.mkdtemp()
 zipfile.ZipFile(a.epub).extractall(tmp)
-opf_rel = re.search(r'full-path="([^"]+)"', open(os.path.join(tmp, "META-INF/container.xml")).read()).group(1)
+opf_rel = re.search(r'full-path="([^"]+)"', open(os.path.join(tmp, "META-INF/container.xml"), encoding="utf-8").read()).group(1)
 oe = os.path.join(tmp, os.path.dirname(opf_rel))
 opf_name = os.path.basename(opf_rel)
 P = lambda f: os.path.join(oe, f)
@@ -45,10 +46,9 @@ for r, _, fs in os.walk(oe):
             os.rename(full, os.path.join(r, new))
         else:
             conv = os.path.join(tmp, "converted.png")  # never convert onto the source file
-            ok = subprocess.run(["sips", "-s", "format", "png", full, "--out", conv],
-                                capture_output=True).returncode == 0
+            ok = convert(full, conv, "png")
             os.remove(full)
-            if not ok:  # not an image sips can read (SVG, HTML error page...): drop it
+            if not ok:  # not a readable image (SVG, HTML error page...): drop it
                 dropped.add(f)
                 continue
             os.replace(conv, os.path.join(r, new))
@@ -131,9 +131,14 @@ if any(t.startswith("Part ") for _, t in entries) and ncx_name \
 if a.cover:
     m = re.search(r'<meta name="cover" content="([^"]+)"', opf)
     href = items.get(m.group(1)) if m else None
+    if not href:  # EPUB 3 marks the cover with a property instead
+        m = re.search(r'<item\b[^>]*properties="[^"]*cover-image[^>]*>', opf)
+        m = m and re.search(r'href="([^"]+)"', m.group(0))
+        href = m.group(1) if m else None
     if href:
         fmt = "png" if href.lower().endswith(".png") else "jpeg"
-        subprocess.run(["sips", "-s", "format", fmt, a.cover, "--out", P(href)], check=True, capture_output=True)
+        if not convert(a.cover, P(href), fmt):
+            raise SystemExit("could not convert the cover image: " + a.cover)
     else:
         print("no cover slot in OPF; for Calibre builds pass --cover to ebook-convert instead")
 
