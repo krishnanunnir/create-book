@@ -54,7 +54,9 @@ They need:
 - Brave, Chrome, Chromium or Edge for covers and previews. Set `BOOK_BROWSER` to the
   browser's path if it isn't found;
 - `sips` (built into macOS) or ImageMagick to convert images;
-- `xmllint` to validate XML. Without it, `check-epub.py` skips that check and says so.
+- `xmllint` to validate XML. Without it, `check-epub.py` skips that check and says so;
+- optionally `epubcheck`, the standard EPUB validator (`brew install epubcheck`).
+  `check-epub.py` runs it when it is installed.
 
 If a tool is missing, tell the user which one and how to install it. Don't work
 around a missing Calibre with another converter: the page-break and TOC rules below
@@ -69,6 +71,8 @@ depend on its options.
 | starts a page wherever the build puts a break | break only at chapters, or pages come out near-empty |
 | is navigated by its table of contents | give sections `##` headings, nest chapters under Parts |
 | shows only JPEG, PNG and GIF | convert AVIF and WebP, fix wrong extensions |
+| has a dark mode, and no support for transparent or animated images | flatten transparent PNGs onto white, or a diagram's black lines vanish on a black page |
+| changes the page colour (dark mode, sepia, e-ink) | never force a text colour: it goes unreadable on the wrong background |
 | loses SVG and complex HTML in Calibre's Markdown path | draw diagrams as text in ```` ```text ```` blocks |
 | has a narrow column | prefer tables with 2–3 columns |
 | is often e-ink, so grayscale | keep the cover title's contrast high |
@@ -133,6 +137,8 @@ Keep these flags in the project's build script. `web-to-epub.sh` already runs
 - converts AVIF, WebP and wrongly named images to PNG, and fixes OPF media types;
 - removes the `Source: file:///...` lines percollate adds to local pages, which leak
   the user's paths;
+- flattens transparent PNGs onto white and turns an animated GIF into a still of its
+  first frame. Flattened PNGs are larger, so a book with many images grows;
 - nests a flat TOC under its "Part" entries;
 - with `--cover`, replaces the cover image.
 
@@ -182,8 +188,17 @@ python3 $SKILL/scripts/check-epub.py out.epub
 
 It exits 1 on hard problems: mimetype not first in the zip, a wrong image format or
 media type, missing files, `file:///` leaks, invalid XML, and duplicate TOC
-`playOrder` values. It also reports things to judge yourself: near-empty pages, wide
-code lines, the TOC tree and the cover size.
+`playOrder` values. It also reports things to judge yourself:
+
+- near-empty pages, wide code lines, the TOC tree and the cover size;
+- transparent PNGs and animated GIFs. Run `fix-epub.py` to fix them;
+- inline text colours, which web articles often carry. Open the file it names, find
+  the element, and remove it or its `style` with `fix-epub.py --junk`;
+- images with no alt text. In a book Claude writes, give every image alt text:
+  `![what the image shows](file.png)`. In a web collection, leave them as they are;
+- the file size, with a warning over 50 MB;
+- `epubcheck` errors, if it is installed. They don't change the exit code. Fix the
+  ones in files you wrote, and mention the rest to the user.
 
 **By eye, at phone width.** `check-epub.py` numbers the pages. Screenshot at least the
 first chapter, and every page that has a diagram or a table:
@@ -198,6 +213,10 @@ Then Read `shot.png`. The shot is 360 pixels wide and 1300 tall.
 - `--scale 2` gives a sharper image. Use it to check diagram alignment: at 1x,
   downscaling can make box borders look misaligned when they are fine.
 
+The screenshot comes from a browser, not from Kindle's own renderer, and it doesn't
+show dark mode. For a book that matters, tell the user they can open the EPUB in
+Amazon's free Kindle Previewer for a last look.
+
 ## 5. Deliver
 
 - If the user chose a format other than EPUB, convert the checked EPUB with Calibre:
@@ -206,4 +225,6 @@ Then Read `shot.png`. The shot is 360 pixels wide and 1300 tall.
   chapter, since `check-epub.py` only checks the EPUB.
 - Put the final book files in one `Final/` folder and give the user that path.
 - Keep sources, build scripts, `spec.json` and covers in `build-files/` next to it.
-- Send to Kindle takes EPUB by email (50 MB limit) or through the Send to Kindle app.
+- Send to Kindle takes EPUB three ways: by email (50 MB limit), through the Send to
+  Kindle app, or on the web at amazon.com/sendtokindle, which is reported to take up
+  to 200 MB. If Amazon rejects the file, run `epubcheck` on it first.

@@ -20,8 +20,9 @@ a cover.
   contents, code lines too wide for a phone.
 - **Make a cover.** A 1600×2560 JPEG (Kindle's recommended size) with a title, a
   one-line promise and a short timeline taken from the book's content.
-- **Check the result.** A script catches broken files, wrong image formats and leaked
-  local paths. Claude also screenshots chapters at phone width and looks at them.
+- **Check the result.** A script catches broken files, wrong image formats, leaked
+  local paths, transparent images and forced colours that break dark mode, and
+  images with no alt text. Claude also screenshots chapters at phone width and looks at them.
 
 ## You stay in charge
 
@@ -51,6 +52,7 @@ Start a new Claude Code session so it picks up the skill.
 | Brave, Chrome, Chromium or Edge | covers and phone previews |
 | `sips` (built into macOS) or ImageMagick | converting images |
 | `xmllint` (optional) | checking that the book's XML is valid |
+| [EPUBCheck](https://www.w3.org/publishing/epubcheck/) (optional) | standard EPUB validation |
 
 The scripts are written and tested on macOS. They are meant to run on Linux too, with
 ImageMagick in place of `sips`, but that has not been tested. If your browser isn't
@@ -80,7 +82,7 @@ They work without Claude too. From `~/.claude/skills/create-book/scripts/`:
 # Web articles (one URL or .html file per line) to EPUB
 ./web-to-epub.sh order.txt "Title" out.epub cover.jpg
 
-# Clean up an EPUB: convert images, nest the TOC, strip clutter
+# Clean up an EPUB: convert and flatten images, nest the TOC, strip clutter
 python3 fix-epub.py out.epub --strip-suffix " | Site Name"
 
 # Check an EPUB (exits 1 on hard problems)
@@ -113,8 +115,9 @@ assets/book.css        the book's stylesheet
 
 ## Send to Kindle
 
-Email the EPUB to your Kindle address (50 MB limit), or use Amazon's Send to Kindle
-app.
+Email the EPUB to your Kindle address (50 MB limit), use Amazon's Send to Kindle app,
+or upload it at amazon.com/sendtokindle. For a last look before sending, open it in
+Amazon's free Kindle Previewer.
 
 ## License
 

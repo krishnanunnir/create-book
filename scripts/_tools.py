@@ -33,18 +33,44 @@ def screenshot(page, png, width, height, scale=1, wait_ms=0):
                    check=True, capture_output=True)
 
 
-def convert(src, dst, fmt):
+def convert(src, dst, fmt, quality=90):
     """Convert an image to fmt ("png" or "jpeg"). True if it worked.
-    Uses sips on macOS, ImageMagick elsewhere."""
+    Uses sips on macOS, ImageMagick elsewhere. An animated GIF gives its first frame."""
     magick = shutil.which("magick") or shutil.which("convert")
     if shutil.which("sips"):
-        quality = ["-s", "formatOptions", "90"] if fmt == "jpeg" else []
+        quality = ["-s", "formatOptions", str(quality)] if fmt == "jpeg" else []
         cmd = ["sips", "-s", "format", fmt, *quality, src, "--out", dst]
     elif magick:
-        cmd = [magick, src + "[0]", "-quality", "90", f"{fmt}:{dst}"]
+        cmd = [magick, src + "[0]", "-quality", str(quality), f"{fmt}:{dst}"]
     else:
         raise SystemExit("Need sips (macOS) or ImageMagick to convert images.")
     return subprocess.run(cmd, capture_output=True).returncode == 0
+
+
+def has_alpha(path):
+    """True for a PNG that can hold transparent pixels (it may still be fully opaque)."""
+    d = open(path, "rb").read()
+    return d.startswith(b"\x89PNG") and (d[25] in (4, 6) or b"tRNS" in d[:max(d.find(b"IDAT"), 0)])
+
+
+def is_animated(path):
+    d = open(path, "rb").read()
+    return d.startswith(b"GIF8") and d.count(b"\x21\xf9\x04") > 1  # one control block per frame
+
+
+def flatten(src, dst):
+    """Write src as a PNG on a white background, with no transparency. True if it worked."""
+    magick = shutil.which("magick") or shutil.which("convert")
+    if magick and not shutil.which("sips"):
+        return subprocess.run([magick, src, "-background", "white", "-alpha", "remove",
+                               "-alpha", "off", "png:" + dst], capture_output=True).returncode == 0
+    # shortcut: sips has no flatten option, but its JPEG writer fills transparency with
+    # white, so go through a quality-100 JPEG. Upgrade if the tiny loss ever shows.
+    mid = dst + ".jpg"
+    ok = convert(src, mid, "jpeg", quality=100) and convert(mid, dst, "png")
+    if os.path.exists(mid):
+        os.remove(mid)
+    return ok
 
 
 def image_size(path):

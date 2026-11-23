@@ -1,6 +1,8 @@
 """Cleans an EPUB in place so it reads well on Kindle.
 
   - Images Kindle cannot show (AVIF, WebP, wrong extension/media type) become PNG.
+  - Transparent PNGs are flattened onto white (they turn black in dark mode), and
+    animated GIFs become a still PNG of their first frame.
   - "Source: file:///..." lines (percollate on local pages) are removed.
   - Optional: strip title suffixes ("| Site"), delete web clutter by regex, set cover.
   - If some chapter titles start with "Part ", the TOC is nested under those parts.
@@ -9,7 +11,7 @@ Usage: python3 fix-epub.py book.epub [--cover cover.jpg]
            [--strip-suffix " | Site"]... [--junk REGEX]...
 """
 import argparse, html, os, re, shutil, tempfile, zipfile
-from _tools import convert
+from _tools import convert, flatten, has_alpha, is_animated
 
 ap = argparse.ArgumentParser()
 ap.add_argument("epub")
@@ -30,7 +32,8 @@ text_files = [os.path.relpath(os.path.join(r, f), oe) for r, _, fs in os.walk(oe
               if f.endswith((".xhtml", ".html", ".ncx", ".opf"))]
 
 # 1. Kindle-safe images.
-renames, dropped = {}, set()
+renames, dropped, flattened = {}, set(), 0
+conv = os.path.join(tmp, "converted.png")  # never convert onto the source file
 for r, _, fs in os.walk(oe):
     for f in fs:
         if not f.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".image")):
@@ -39,13 +42,16 @@ for r, _, fs in os.walk(oe):
         head = open(full, "rb").read(16)
         png, jpg, gif = head.startswith(b"\x89PNG"), head.startswith(b"\xff\xd8"), head.startswith(b"GIF8")
         ext = os.path.splitext(f)[1].lower()
-        if (png and ext == ".png") or (jpg and ext in (".jpg", ".jpeg")) or (gif and ext == ".gif"):
+        animated = gif and is_animated(full)
+        if png and has_alpha(full) and flatten(full, conv):
+            os.replace(conv, full)
+            flattened += 1
+        if not animated and ((png and ext == ".png") or (jpg and ext in (".jpg", ".jpeg")) or (gif and ext == ".gif")):
             continue
-        new = os.path.splitext(f)[0] + (".jpg" if jpg else ".gif" if gif else ".png")
-        if png or jpg or gif:
+        new = os.path.splitext(f)[0] + (".jpg" if jpg else ".gif" if gif and not animated else ".png")
+        if (png or jpg or gif) and not animated:
             os.rename(full, os.path.join(r, new))
         else:
-            conv = os.path.join(tmp, "converted.png")  # never convert onto the source file
             ok = convert(full, conv, "png")
             os.remove(full)
             if not ok:  # not a readable image (SVG, HTML error page...): drop it
@@ -153,4 +159,4 @@ with zipfile.ZipFile(out, "w") as z:
                 z.write(os.path.join(r, f), rel, compress_type=zipfile.ZIP_DEFLATED)
 os.replace(out, a.epub)
 shutil.rmtree(tmp)
-print("fixed: %d images converted/renamed" % len(renames))
+print("fixed: %d images converted/renamed, %d flattened onto white" % (len(renames), flattened))
