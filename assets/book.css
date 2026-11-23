@@ -1,0 +1,9 @@
+body { font-family: Georgia, serif; line-height: 1.5; }
+h1 { font-size: 1.8em; line-height: 1.2; }
+h2 { font-size: 1.3em; margin-top: 1.3em; page-break-after: avoid; }
+h3 { font-size: 1.1em; page-break-after: avoid; }
+pre { white-space: pre-wrap; font-size: 0.65em; line-height: 1.25; background: #f4f4f4; color: #111; padding: 0.5em; }
+code { font-family: Menlo, Consolas, monospace; }
+table { border-collapse: collapse; width: 100%; font-size: 0.85em; }
+th, td { border: 1px solid #bbb; padding: 0.25em 0.4em; text-align: left; vertical-align: top; }
+blockquote { border-left: 4px solid #1d4ed8; margin-left: 0; padding-left: 0.8em; }
