@@ -109,3 +109,7 @@ assets/book.css        the book's stylesheet
 
 Email the EPUB to your Kindle address (50 MB limit), or use Amazon's Send to Kindle
 app.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
