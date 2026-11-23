@@ -14,7 +14,7 @@ Before writing, it checks three things with you:
 ## Install
 
 ```bash
-git clone <this-repo-url> ~/.claude/skills/create-book
+git clone https://github.com/krishnanunnir/create-book.git ~/.claude/skills/create-book
 ```
 
 Then ask Claude Code for a book, or type `/create-book`.
